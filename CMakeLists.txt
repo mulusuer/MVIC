@@ -25,6 +25,8 @@ add_executable(MVIC main.cpp
         camera.ui
         CameraWorker.cpp
         CameraWorker.h
+        ImageProcessor.cpp
+        ImageProcessor.h
 )
 
 target_include_directories(MVIC PRIVATE ${OpenCV_INCLUDE_DIRS})

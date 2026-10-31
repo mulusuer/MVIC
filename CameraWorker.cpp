@@ -1,16 +1,17 @@
-#include <qcoreapplication.h>
-
-#include "cameraworker.h"
+#include "CameraWorker.h"
 #include <QDebug>
+#include <QCoreApplication>
 
-CameraWorker::CameraWorker(QObject *parent) : QObject(parent), isRunning_(false) {}
+CameraWorker::CameraWorker(QObject *parent) : QObject(parent), isRunning_(false) {
+    procTimer_.start();
+}
 
 CameraWorker::~CameraWorker() {
     closeCamera();
 }
 
 double CameraWorker::get_exposure_mode() {
-    return cap_.get(cv::CAP_PROP_EXPOSURE);;
+    return cap_.get(cv::CAP_PROP_EXPOSURE);
 }
 
 double CameraWorker::get_gain_mode() {
@@ -23,12 +24,10 @@ double CameraWorker::get_frame_mode() {
 
 void CameraWorker::openCamera(int index) {
     QMutexLocker locker(&mutex_);
-    if (cap_.isOpened()) {
-        cap_.release();
-    }
+    if (cap_.isOpened()) cap_.release();
 
     readHardwareParams();
-    paramsReady(fps_, exposure_, gain_);
+    emit paramsReady(fps_, exposure_, gain_);
 
     cap_.open(index, cv::CAP_DSHOW);
     if (!cap_.isOpened()) {
@@ -36,43 +35,22 @@ void CameraWorker::openCamera(int index) {
         emit cameraOpened(false);
         return;
     }
-    
     emit cameraOpened(true);
 }
 
 void CameraWorker::closeCamera() {
-    stopAcquisition(); 
-    
+    stopAcquisition();
+
     QMutexLocker locker(&mutex_);
-    if (cap_.isOpened()) {
-        cap_.release();
-    }
+    if (cap_.isOpened()) cap_.release();
 
-    pushDisplay();
-}
-
-void CameraWorker::setContinuousMode(bool isContinuous) {
-    isContinuousMode_ = isContinuous;
+    emit pushDisplay();
 }
 
 void CameraWorker::stopAndCleanup() {
     stopAcquisition();
     closeCamera();
     QThread::currentThread()->quit();
-}
-
-void CameraWorker::softTriggerOnce() {
-    QMutexLocker cacheLocker(&latestFrameMutex_);
-    if (latestFrame_.empty()) {
-        qDebug() << "软触发失败：暂无最新图像帧";
-        return;
-    }
-
-    // 把刚才偷偷缓存的最新帧转码，发给界面
-    cv::Mat rgbFrame;
-    cv::cvtColor(latestFrame_, rgbFrame, cv::COLOR_BGR2RGB);
-    QImage qimg(rgbFrame.data, rgbFrame.cols, rgbFrame.rows, rgbFrame.step, QImage::Format_RGB888);
-    emit frameReady(qimg.copy());
 }
 
 void CameraWorker::startAcquisition() {
@@ -92,16 +70,21 @@ void CameraWorker::startAcquisition() {
             continue;
         }
 
-        if (isContinuousMode_) {
-            // 连续模式：转码并直接发送给界面显示
-            cv::Mat rgbFrame;
-            cv::cvtColor(frame, rgbFrame, cv::COLOR_BGR2RGB);
-            QImage qimg(rgbFrame.data, rgbFrame.cols, rgbFrame.rows, rgbFrame.step, QImage::Format_RGB888);
-            emit frameReady(qimg.copy());
-        } else {
-            // 触发模式：把最新帧存起来
-            QMutexLocker cacheLocker(&latestFrameMutex_);
-            latestFrame_ = frame.clone();
+        // BGR -> RGB，界面显示和识别都用这一份
+        cv::Mat rgb;
+        cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
+        QImage qimg(rgb.data, rgb.cols, rgb.rows,
+                    rgb.step, QImage::Format_RGB888);
+
+        emit frameReady(qimg.copy());       // -> UI 显示
+
+        // 送一帧去识别（限流 200ms，上一帧还没处理完就跳过）
+        if (processEnabled_.load()
+            && procBusy_.load() == 0
+            && procTimer_.elapsed() >= 200) {
+            procTimer_.restart();
+            procBusy_.store(1);
+            emit frameForProcess(qimg.copy());
         }
 
         QThread::msleep(10);
@@ -115,41 +98,45 @@ void CameraWorker::stopAcquisition() {
 
 void CameraWorker::setExposure(double val) {
     QMutexLocker locker(&mutex_);
-    if (cap_.isOpened()) {
-        cap_.set(cv::CAP_PROP_EXPOSURE, val);
-    }
+    if (cap_.isOpened()) cap_.set(cv::CAP_PROP_EXPOSURE, val);
 }
 
 void CameraWorker::setExposureValue(double val) {
     QMutexLocker locker(&mutex_);
     if (cap_.isOpened()) {
-        bool success = cap_.set(cv::CAP_PROP_EXPOSURE, val);
-        qDebug() << "设置曝光为:" << val << " 结果:" << success;
+        bool ok = cap_.set(cv::CAP_PROP_EXPOSURE, val);
+        qDebug() << "设置曝光为:" << val << " 结果:" << ok;
     }
 }
 
 void CameraWorker::setGainValue(double val) {
     QMutexLocker locker(&mutex_);
     if (cap_.isOpened()) {
-        bool success = cap_.set(cv::CAP_PROP_GAIN, val);
-        qDebug() << "设置增益为:" << val << " 结果:" << success;
+        bool ok = cap_.set(cv::CAP_PROP_GAIN, val);
+        qDebug() << "设置增益为:" << val << " 结果:" << ok;
     }
 }
 
 void CameraWorker::setFrameValue(double val) {
     QMutexLocker locker(&mutex_);
     if (cap_.isOpened()) {
-        bool success = cap_.set(cv::CAP_PROP_FPS, val);
-        qDebug() << "设置帧率为:" << val << " 结果:" << success;
+        bool ok = cap_.set(cv::CAP_PROP_FPS, val);
+        qDebug() << "设置帧率为:" << val << " 结果:" << ok;
     }
 }
 
 void CameraWorker::readHardwareParams() {
     fps_ = get_frame_mode();
-
     exposure_ = get_exposure_mode();
-
     gain_ = get_gain_mode();
-
     emit paramsReady(fps_, exposure_, gain_);
+}
+
+// 新增
+void CameraWorker::setProcessingEnabled(bool on) {
+    processEnabled_.store(on);
+}
+
+void CameraWorker::setProcBusy(bool busy) {
+    procBusy_.store(busy);
 }

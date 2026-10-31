@@ -6,123 +6,539 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>664</width>
-    <height>804</height>
+    <width>1448</width>
+    <height>969</height>
    </rect>
   </property>
-  <property name="windowTitle">
-   <string>Camera</string>
+  <property name="minimumSize">
+   <size>
+    <width>900</width>
+    <height>620</height>
+   </size>
   </property>
-  <layout class="QGridLayout" name="gridLayout_8">
-   <item row="0" column="0">
-    <layout class="QGridLayout" name="gridLayout" rowstretch="2,2,2,1,1,5" columnstretch="6,4,0">
-     <item row="0" column="0">
-      <widget class="QGroupBox" name="groupBox_5">
-       <property name="title">
-        <string>相机选取</string>
-       </property>
-       <layout class="QGridLayout" name="gridLayout_6">
-        <item row="0" column="0">
-         <widget class="QComboBox" name="comboBox_camera_list"/>
-        </item>
-       </layout>
-      </widget>
-     </item>
-     <item row="4" column="1" colspan="2">
-      <widget class="QGroupBox" name="groupBox_2">
-       <property name="title">
-        <string>图片保存</string>
-       </property>
-       <layout class="QGridLayout" name="gridLayout_3">
-        <item row="0" column="0">
-         <widget class="QPushButton" name="save_btn">
+  <property name="windowTitle">
+   <string>MVIC · 视觉采集</string>
+  </property>
+  <property name="styleSheet">
+   <string>/* ===== MVIC · 现代浅色主题 ===== */
+* {
+    font-family: &quot;Microsoft YaHei UI&quot;, &quot;Microsoft YaHei&quot;, &quot;PingFang SC&quot;, &quot;Segoe UI&quot;, sans-serif;
+}
+
+QWidget#Camera {
+    background-color: #F4F6FA;
+    font-size: 13px;
+    color: #1F2937;
+}
+
+/* ---------- 顶栏 ---------- */
+QFrame#topBar {
+    background-color: #FFFFFF;
+    border: 1px solid #E4E9F2;
+    border-radius: 12px;
+}
+QLabel#appBadge {
+    background-color: #2F6BFF;
+    color: #FFFFFF;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+}
+QLabel#appTitle {
+    font-size: 17px;
+    font-weight: 700;
+    color: #111827;
+}
+QLabel#appSubTitle {
+    font-size: 12px;
+    color: #98A2B3;
+}
+QLabel#versionTag {
+    font-size: 11px;
+    color: #2F6BFF;
+    background-color: #EDF3FF;
+    border: 1px solid #D6E4FF;
+    border-radius: 9px;
+    padding: 4px 10px;
+}
+
+/* ---------- 通用文本 ---------- */
+QLabel {
+    color: #4B5563;
+}
+
+/* ---------- 卡片容器 ---------- */
+QGroupBox {
+    background-color: #FFFFFF;
+    border: 1px solid #E4E9F2;
+    border-radius: 12px;
+    margin-top: 14px;
+    padding: 18px 14px 14px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 14px;
+    top: 1px;
+    padding: 0 6px;
+    color: #6B7280;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* ---------- 图像显示区（取景器） ---------- */
+QLabel#label_display {
+    background-color: #0F172A;
+    border: 1px solid #0B1220;
+    border-radius: 10px;
+    color: #8FA3BF;
+    font-size: 14px;
+}
+QLabel#label_hint {
+    color: #98A2B3;
+    font-size: 12px;
+}
+
+/* ---------- 按钮：通用 ---------- */
+QPushButton {
+    background-color: #FFFFFF;
+    border: 1px solid #D8DFEA;
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: #374151;
+    font-weight: 500;
+    min-height: 18px;
+}
+QPushButton:hover {
+    background-color: #F2F6FF;
+    border-color: #A9C2FF;
+    color: #1D4ED8;
+}
+QPushButton:pressed {
+    background-color: #E3ECFF;
+}
+QPushButton:disabled {
+    background-color: #F2F4F7;
+    color: #B0B8C4;
+    border-color: #E4E9F2;
+}
+
+/* ---------- 按钮：查找设备（主色） ---------- */
+QPushButton#find_btn {
+    background-color: #2F6BFF;
+    border: 1px solid #2F6BFF;
+    color: #FFFFFF;
+}
+QPushButton#find_btn:hover {
+    background-color: #1D5AEF;
+    border-color: #1D5AEF;
+    color: #FFFFFF;
+}
+QPushButton#find_btn:pressed {
+    background-color: #1748C6;
+    border-color: #1748C6;
+}
+
+/* ---------- 按钮：打开设备（成功） ---------- */
+QPushButton#open_btn {
+    background-color: #16A34A;
+    border: 1px solid #16A34A;
+    color: #FFFFFF;
+}
+QPushButton#open_btn:hover {
+    background-color: #128C3E;
+    border-color: #128C3E;
+    color: #FFFFFF;
+}
+QPushButton#open_btn:pressed {
+    background-color: #0F7534;
+    border-color: #0F7534;
+}
+QPushButton#open_btn:disabled {
+    background-color: #EAF7EF;
+    color: #A5CBB5;
+    border-color: #D9EDE2;
+}
+
+/* ---------- 按钮：关闭设备（危险描边） ---------- */
+QPushButton#close_btn {
+    background-color: #FFFFFF;
+    border: 1px solid #F3B9B9;
+    color: #DC2626;
+}
+QPushButton#close_btn:hover {
+    background-color: #FEF2F2;
+    border-color: #DC2626;
+    color: #B91C1C;
+}
+QPushButton#close_btn:pressed {
+    background-color: #FCE7E7;
+}
+QPushButton#close_btn:disabled {
+    background-color: #F2F4F7;
+    color: #C4B3B3;
+    border-color: #E4E9F2;
+}
+
+/* ---------- 按钮：开始采集 ---------- */
+QPushButton#start_btn {
+    background-color: #0EA5A0;
+    border: 1px solid #0EA5A0;
+    color: #FFFFFF;
+}
+QPushButton#start_btn:hover {
+    background-color: #0B8E8A;
+    border-color: #0B8E8A;
+    color: #FFFFFF;
+}
+QPushButton#start_btn:pressed {
+    background-color: #097673;
+    border-color: #097673;
+}
+QPushButton#start_btn:disabled {
+    background-color: #E6F7F6;
+    color: #9CC9C7;
+    border-color: #D3EDEB;
+}
+
+/* ---------- 按钮：停止采集 ---------- */
+QPushButton#stop_btn {
+    background-color: #EF4444;
+    border: 1px solid #EF4444;
+    color: #FFFFFF;
+}
+QPushButton#stop_btn:hover {
+    background-color: #DC2626;
+    border-color: #DC2626;
+    color: #FFFFFF;
+}
+QPushButton#stop_btn:pressed {
+    background-color: #B91C1C;
+    border-color: #B91C1C;
+}
+QPushButton#stop_btn:disabled {
+    background-color: #FDECEC;
+    color: #DCA9A9;
+    border-color: #F7D9D9;
+}
+
+/* ---------- 按钮：保存 ---------- */
+QPushButton#save_btn {
+    background-color: #2F6BFF;
+    border: 1px solid #2F6BFF;
+    color: #FFFFFF;
+}
+QPushButton#save_btn:hover {
+    background-color: #1D5AEF;
+    border-color: #1D5AEF;
+    color: #FFFFFF;
+}
+QPushButton#save_btn:pressed {
+    background-color: #1748C6;
+    border-color: #1748C6;
+}
+QPushButton#save_btn:disabled {
+    background-color: #F2F4F7;
+    color: #B0B8C4;
+    border-color: #E4E9F2;
+}
+
+/* ---------- 下拉框 ---------- */
+QComboBox {
+    background-color: #FFFFFF;
+    border: 1px solid #D8DFEA;
+    border-radius: 8px;
+    padding: 7px 10px;
+    min-height: 18px;
+    color: #1F2937;
+}
+QComboBox:hover {
+    border-color: #A9C2FF;
+}
+QComboBox:disabled {
+    background-color: #F2F4F7;
+    color: #AFB7C4;
+    border-color: #E4E9F2;
+}
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 24px;
+    border: none;
+    background: transparent;
+}
+QComboBox::down-arrow {
+    width: 0px;
+    height: 0px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #7A869A;
+    margin-right: 6px;
+}
+QComboBox QAbstractItemView {
+    background-color: #FFFFFF;
+    border: 1px solid #E4E9F2;
+    border-radius: 8px;
+    padding: 4px;
+    selection-background-color: #EDF3FF;
+    selection-color: #1D4ED8;
+    outline: 0px;
+}
+
+/* ---------- 输入框 ---------- */
+QLineEdit {
+    background-color: #FFFFFF;
+    border: 1px solid #D8DFEA;
+    border-radius: 8px;
+    padding: 7px 10px;
+    color: #1F2937;
+    selection-background-color: #2F6BFF;
+    selection-color: #FFFFFF;
+}
+QLineEdit:hover {
+    border-color: #A9C2FF;
+}
+QLineEdit:focus {
+    border-color: #2F6BFF;
+    background-color: #FBFCFF;
+}
+QLineEdit:disabled {
+    background-color: #F2F4F7;
+    color: #AFB7C4;
+    border-color: #E4E9F2;
+}
+
+/* ---------- 单选 / 复选 ---------- */
+QRadioButton, QCheckBox {
+    spacing: 8px;
+    color: #374151;
+}
+QRadioButton::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    border: 1px solid #C3CDDB;
+    background-color: #FFFFFF;
+}
+QRadioButton::indicator:hover {
+    border-color: #7FA6FF;
+}
+QRadioButton::indicator:checked {
+    border: 5px solid #2F6BFF;
+    background-color: #FFFFFF;
+}
+QRadioButton:disabled, QCheckBox:disabled {
+    color: #AFB7C4;
+}
+QRadioButton::indicator:disabled {
+    border-color: #E4E9F2;
+    background-color: #F7F8FA;
+}
+QCheckBox::indicator {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid #C3CDDB;
+    background-color: #FFFFFF;
+}
+QCheckBox::indicator:hover {
+    border-color: #7FA6FF;
+}
+QCheckBox::indicator:checked {
+    background-color: #2F6BFF;
+    border: 1px solid #2F6BFF;
+}
+QCheckBox::indicator:disabled {
+    border-color: #E4E9F2;
+    background-color: #F7F8FA;
+}
+
+/* ---------- 滚动条 ---------- */
+QScrollBar:vertical {
+    background: #F4F6FA;
+    width: 10px;
+    margin: 0px;
+    border: none;
+}
+QScrollBar::handle:vertical {
+    background: #D3DAE5;
+    border-radius: 5px;
+    min-height: 30px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #B9C3D2;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="spacing">
+    <number>14</number>
+   </property>
+   <property name="leftMargin">
+    <number>16</number>
+   </property>
+   <property name="topMargin">
+    <number>16</number>
+   </property>
+   <property name="rightMargin">
+    <number>16</number>
+   </property>
+   <property name="bottomMargin">
+    <number>16</number>
+   </property>
+   <item>
+    <widget class="QFrame" name="topBar">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>64</height>
+      </size>
+     </property>
+     <layout class="QHBoxLayout" name="topBarLayout">
+      <property name="spacing">
+       <number>12</number>
+      </property>
+      <property name="leftMargin">
+       <number>16</number>
+      </property>
+      <property name="topMargin">
+       <number>10</number>
+      </property>
+      <property name="rightMargin">
+       <number>16</number>
+      </property>
+      <property name="bottomMargin">
+       <number>10</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="appBadge">
+        <property name="minimumSize">
+         <size>
+          <width>40</width>
+          <height>40</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>40</width>
+          <height>40</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>MV</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QVBoxLayout" name="titleLayout">
+        <property name="spacing">
+         <number>2</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="appTitle">
           <property name="text">
-           <string>保存</string>
+           <string>MVIC 视觉采集平台</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="appSubTitle">
+          <property name="text">
+           <string>Machine Vision Image Capture</string>
           </property>
          </widget>
         </item>
        </layout>
-      </widget>
-     </item>
-     <item row="5" column="1" colspan="2">
-      <widget class="QGroupBox" name="groupBox_3">
-       <property name="title">
-        <string>参数</string>
-       </property>
-       <layout class="QGridLayout" name="gridLayout_4">
-        <item row="0" column="1">
-         <widget class="QLineEdit" name="lineEdit_exposure"/>
-        </item>
-        <item row="1" column="1">
-         <widget class="QLineEdit" name="lineEdit_gain"/>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="label_2">
-          <property name="text">
-           <string>增益</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0">
-         <widget class="QLabel" name="label">
-          <property name="text">
-           <string>曝光</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="0">
-         <widget class="QLabel" name="label_3">
-          <property name="text">
-           <string>帧率</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="1">
-         <widget class="QLineEdit" name="lineEdit_frame"/>
-        </item>
-       </layout>
-      </widget>
-     </item>
-     <item row="0" column="1" colspan="2">
-      <widget class="QGroupBox" name="groupBox_4">
-       <property name="title">
-        <string>初始化</string>
-       </property>
-       <layout class="QGridLayout" name="gridLayout_5">
-        <item row="1" column="0">
-         <widget class="QPushButton" name="open_btn">
-          <property name="text">
-           <string>打开设备</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0" colspan="2">
-         <widget class="QPushButton" name="find_btn">
-          <property name="text">
-           <string>查找设备</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="QPushButton" name="close_btn">
-          <property name="text">
-           <string>关闭设备</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-     </item>
-     <item row="1" column="0" rowspan="5">
+      </item>
+      <item>
+       <widget class="QWidget" name="topBarStretch" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="versionTag">
+        <property name="text">
+         <string>v1.0 · Qt 5.15</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="bodyLayout">
+     <property name="spacing">
+      <number>14</number>
+     </property>
+     <item>
       <widget class="QGroupBox" name="groupBox_6">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
        <property name="title">
         <string>相机显示</string>
        </property>
-       <layout class="QGridLayout" name="gridLayout_7">
-        <item row="0" column="0">
+       <layout class="QVBoxLayout" name="displayLayout">
+        <property name="spacing">
+         <number>10</number>
+        </property>
+        <property name="leftMargin">
+         <number>12</number>
+        </property>
+        <property name="topMargin">
+         <number>18</number>
+        </property>
+        <property name="rightMargin">
+         <number>12</number>
+        </property>
+        <property name="bottomMargin">
+         <number>12</number>
+        </property>
+        <item>
          <widget class="QLabel" name="label_display">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Ignored" vsizetype="Ignored">
+            <horstretch>1</horstretch>
+            <verstretch>1</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>480</width>
+            <height>360</height>
+           </size>
+          </property>
           <property name="text">
            <string/>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignCenter</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_hint">
+          <property name="text">
+           <string>操作流程：查找设备 → 打开设备 → 开始采集 → 保存图像</string>
           </property>
           <property name="alignment">
            <set>Qt::AlignCenter</set>
@@ -132,52 +548,268 @@
        </layout>
       </widget>
      </item>
-     <item row="1" column="1" rowspan="3" colspan="2">
-      <widget class="QGroupBox" name="groupBox">
-       <property name="title">
-        <string>图像采集</string>
+     <item>
+      <widget class="QWidget" name="rightPanel" native="true">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
        </property>
-       <layout class="QGridLayout" name="gridLayout_2">
-        <item row="0" column="0">
-         <widget class="QRadioButton" name="radioButton_connect">
-          <property name="text">
-           <string>连续模式</string>
+       <property name="minimumSize">
+        <size>
+         <width>280</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>320</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <layout class="QVBoxLayout" name="rightLayout">
+        <property name="spacing">
+         <number>12</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QGroupBox" name="groupBox_5">
+          <property name="title">
+           <string>相机选取</string>
           </property>
+          <layout class="QVBoxLayout" name="selectLayout">
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <item>
+            <widget class="QComboBox" name="comboBox_camera_list">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="toolTip">
+              <string>选择要使用的相机设备</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="find_btn">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="toolTip">
+              <string>重新扫描系统中的相机设备</string>
+             </property>
+             <property name="text">
+              <string>查找设备</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
-        <item row="1" column="0">
-         <widget class="QPushButton" name="start_btn">
-          <property name="text">
-           <string>开始采集</string>
+        <item>
+         <widget class="QGroupBox" name="groupBox_4">
+          <property name="title">
+           <string>初始化</string>
           </property>
+          <layout class="QHBoxLayout" name="initLayout">
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <item>
+            <widget class="QPushButton" name="open_btn">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="text">
+              <string>打开设备</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="close_btn">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="text">
+              <string>关闭设备</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
-        <item row="2" column="1">
-         <widget class="QPushButton" name="soft_trigger_btn">
-          <property name="text">
-           <string>软触发一次</string>
+        <item>
+         <widget class="QGroupBox" name="groupBox">
+          <property name="title">
+           <string>图像采集</string>
           </property>
+          <layout class="QVBoxLayout" name="acquireLayout">
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <item>
+            <layout class="QHBoxLayout" name="runLayout">
+             <property name="spacing">
+              <number>10</number>
+             </property>
+             <item>
+              <widget class="QPushButton" name="start_btn">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="text">
+                <string>开始采集</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="stop_btn">
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                 <horstretch>0</horstretch>
+                 <verstretch>0</verstretch>
+                </sizepolicy>
+               </property>
+               <property name="text">
+                <string>停止采集</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_result">
+             <property name="text">
+              <string/>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
-        <item row="0" column="1">
-         <widget class="QRadioButton" name="radioButton_trigger">
-          <property name="text">
-           <string>触发模式</string>
+        <item>
+         <widget class="QGroupBox" name="groupBox_3">
+          <property name="title">
+           <string>参数</string>
           </property>
+          <layout class="QGridLayout" name="paramLayout">
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <item row="0" column="0">
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>曝光</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLineEdit" name="lineEdit_exposure">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="toolTip">
+              <string>输入曝光值后按回车生效</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label_2">
+             <property name="text">
+              <string>增益</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLineEdit" name="lineEdit_gain">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="toolTip">
+              <string>输入增益值后按回车生效</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_3">
+             <property name="text">
+              <string>帧率</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QLineEdit" name="lineEdit_frame">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="toolTip">
+              <string>输入目标帧率后按回车生效</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
-        <item row="1" column="1">
-         <widget class="QPushButton" name="stop_btn">
-          <property name="text">
-           <string>停止采集</string>
+        <item>
+         <widget class="QGroupBox" name="groupBox_2">
+          <property name="title">
+           <string>图片保存</string>
           </property>
-         </widget>
-        </item>
-        <item row="2" column="0">
-         <widget class="QCheckBox" name="checkBox_soft_trigger">
-          <property name="text">
-           <string>软触发</string>
-          </property>
+          <layout class="QVBoxLayout" name="saveLayout">
+           <item>
+            <widget class="QPushButton" name="save_btn">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="toolTip">
+              <string>将当前画面保存到 images 目录并写入数据库</string>
+             </property>
+             <property name="text">
+              <string>保存</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
         </item>
        </layout>

@@ -1,0 +1,44 @@
+# ---------- 构建产物 ----------
+cmake-build-*/
+build/
+out/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.exe
+*.dll
+*.a
+*.lib
+*.pdb
+*.ilk
+*.obj
+*.o
+
+# ---------- Qt / CMake 自动生成 ----------
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.autosave
+.automoc/
+
+# ---------- IDE ----------
+.idea/
+.vscode/
+*.swp
+*~
+
+# ---------- WorkBuddy 工作区数据 ----------
+.workbuddy/
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ---------- 运行时产物 ----------
+images/
+data.db
+plugins/

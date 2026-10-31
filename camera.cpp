@@ -1,32 +1,67 @@
-//
-// Created by yyh on 2026/10/19.
-//
-
-// You may need to build the project (run Qt uic code generator) to get "ui_Camera.h" resolved
-
 #include "camera.h"
 
-
+#include <QFileDialog>
+#include <QPushButton>
 
 Camera::Camera(QWidget *parent) : QWidget(parent), ui(new Ui::Camera),
-trigger_mode_(Connect_Mode), soft_trigger_(false),
 workerThread_(new QThread(this)), worker_(new CameraWorker()) {
     ui->setupUi(this);
 
+    // 1. worker 搬入采集线程
     worker_->moveToThread(workerThread_);
 
+    // 2. ★ 处理线程和 processor 必须在 connect_init 之前创建
+    processorThread_ = new QThread(this);
+    processor_       = new ImageProcessor();
+    processor_->moveToThread(processorThread_);
+
+    // 3. 建立所有连接
     connect_init();
 
+    // 4. 启动线程
     workerThread_->start();
+    processorThread_->start();
 
+    // 5. 加一个"打开图片识别"按钮，插在"保存"按钮那一栏里
+    auto *openImageBtn = new QPushButton("打开图片识别", this);
+    QWidget *holder = ui->save_btn;
+    while (holder && !holder->layout())
+        holder = holder->parentWidget();
+    if (holder && holder->layout())
+        holder->layout()->addWidget(openImageBtn);
+
+    connect(openImageBtn, &QPushButton::clicked, this, [this]() {
+        const QString file = QFileDialog::getOpenFileName(
+            this, "选择一张车牌照片", QString(),
+            "图片 (*.jpg *.jpeg *.png *.bmp)");
+        if (file.isEmpty()) return;
+
+        QImage img(file);
+        if (img.isNull()) {
+            QMessageBox::warning(this, "错误", "这张图片打不开");
+            return;
+        }
+
+        processingActive_ = true;                 // 让处理结果显示到画面上
+        ui->label_result->setText("识别中，第一次要加载模型请稍等...");
+        lastImageFile_ = file;
+
+        QMetaObject::invokeMethod(processor_, "processFrame",
+                                  Qt::QueuedConnection, Q_ARG(QImage, img));
+    });
+
+    // 6. UI 初始化
     data_init();
 }
 
 Camera::~Camera() {
     if (workerThread_->isRunning()) {
-        QMetaObject::invokeMethod(worker_, "stopAndCleanup",
-                                  Qt::QueuedConnection);
+        QMetaObject::invokeMethod(worker_, "stopAndCleanup", Qt::QueuedConnection);
         workerThread_->wait();
+    }
+    if (processorThread_ && processorThread_->isRunning()) {
+        processorThread_->quit();
+        processorThread_->wait();
     }
     delete ui;
 }
@@ -38,8 +73,6 @@ void Camera::onCameraOpened(bool success) {
         setAcquireModuleEnabled(1);
         ui->stop_btn->setEnabled(0);
         setSelectModuleEnabled(0);
-        ui->checkBox_soft_trigger->setEnabled(0);
-        ui->soft_trigger_btn->setEnabled(0);
         ui->label_display->setText("请开始采集");
     }
 }
@@ -50,8 +83,29 @@ void Camera::handleError(const QString &msg) {
 
 void Camera::updateFrameUI(const QImage &img) {
     currentImage_ = img;
-    ui->label_display->setPixmap(QPixmap::fromImage(img).scaled(
-        ui->label_display->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    // 处理中：由 updateProcessedFrame 负责刷新 label_display
+    if (processingActive_) return;
+
+    ui->label_display->setPixmap(
+        QPixmap::fromImage(img).scaled(
+            ui->label_display->size(),
+            Qt::KeepAspectRatio,
+            Qt::SmoothTransformation));
+}
+
+void Camera::updateProcessedFrame(const QImage &img) {
+    if (!processingActive_) return;   // 已停止时忽略迟到帧
+
+    ui->label_display->setPixmap(
+        QPixmap::fromImage(img).scaled(
+            ui->label_display->size(),
+            Qt::KeepAspectRatio,
+            Qt::SmoothTransformation));
+}
+
+void Camera::onPlateFound(const QString &text) {
+    ui->label_result->setText("车牌: " + text);
 }
 
 void Camera::findCamera() {
@@ -60,9 +114,8 @@ void Camera::findCamera() {
     setAllDeviceUiEnabled(0);
     if (cameras_.isEmpty()) {
         ui->comboBox_camera_list->addItem("未检测到摄像头");
-        return ;
+        return;
     }
-
     for (auto &cameraInfo : cameras_) {
         ui->comboBox_camera_list->addItem(cameraInfo.description());
     }
@@ -82,45 +135,19 @@ void Camera::on_comboBox_camera_list_currentIndexChanged(const QString &arg) {
     setInitModuleEnabled(1);
 }
 
-void Camera::on_checkBox_soft_trigger_stateChanged(int arg) {
-    if (arg == Qt::Checked) {
-        soft_trigger_ = 1;
-    } else {
-        soft_trigger_ = 0;
-    }
-    if (trigger_mode_ == Trigger_Mode) {
-        ui->soft_trigger_btn->setEnabled(soft_trigger_);
-    }
-}
-
-void Camera::on_radioButton_connect_clicked() {
-    trigger_mode_ = Connect_Mode;
-    ui->checkBox_soft_trigger->setEnabled(false);
-    ui->soft_trigger_btn->setEnabled(false);
-    // 通知子线程：切到连续模式
-    QMetaObject::invokeMethod(worker_, "setContinuousMode", Qt::QueuedConnection, Q_ARG(bool, true));
-}
-
-void Camera::on_radioButton_trigger_clicked() {
-    trigger_mode_ = Trigger_Mode;
-    ui->checkBox_soft_trigger->setEnabled(true);
-    ui->soft_trigger_btn->setEnabled(soft_trigger_);
-    // 通知子线程：切到触发模式
-    QMetaObject::invokeMethod(worker_, "setContinuousMode", Qt::QueuedConnection, Q_ARG(bool, false));
-}
-
 void Camera::on_open_btn_clicked() {
     int index = ui->comboBox_camera_list->currentIndex();
-    // 子线程打开设备
-    QMetaObject::invokeMethod(worker_, "openCamera", Qt::QueuedConnection, Q_ARG(int, index));
-    // 子线程开始死循环读图
+    QMetaObject::invokeMethod(worker_, "openCamera",
+                              Qt::QueuedConnection, Q_ARG(int, index));
 }
 
 void Camera::on_close_btn_clicked() {
-    // 关闭设备前，先停止采集
     QMetaObject::invokeMethod(worker_, "stopAcquisition", Qt::QueuedConnection);
-    // 再关闭设备
     QMetaObject::invokeMethod(worker_, "closeCamera", Qt::QueuedConnection);
+
+    processingActive_ = false;
+    QMetaObject::invokeMethod(worker_, "setProcessingEnabled",
+                              Qt::QueuedConnection, Q_ARG(bool, false));
 
     setInitModuleEnabled(1);
     setParamModuleEnabled(0);
@@ -132,26 +159,29 @@ void Camera::on_close_btn_clicked() {
 void Camera::on_start_btn_clicked() {
     QMetaObject::invokeMethod(worker_, "startAcquisition", Qt::QueuedConnection);
 
+    // 开始采集 → 同时打开车牌检测
+    processingActive_ = true;
+    lastImageFile_.clear();      // 来源是摄像头，不是打开的图片
+    QMetaObject::invokeMethod(worker_, "setProcessingEnabled",
+                              Qt::QueuedConnection, Q_ARG(bool, true));
+    ui->label_result->clear();
+
     ui->start_btn->setEnabled(false);
     ui->stop_btn->setEnabled(true);
 
-    if (trigger_mode_ == Trigger_Mode && soft_trigger_) {
-        ui->soft_trigger_btn->setEnabled(true);
-    }
     setSaveModuleEnabled(1);
 }
 
 void Camera::on_stop_btn_clicked() {
     QMetaObject::invokeMethod(worker_, "stopAcquisition", Qt::QueuedConnection);
+
+    processingActive_ = false;
+    QMetaObject::invokeMethod(worker_, "setProcessingEnabled",
+                              Qt::QueuedConnection, Q_ARG(bool, false));
+
     ui->start_btn->setEnabled(true);
     ui->stop_btn->setEnabled(false);
-    ui->soft_trigger_btn->setEnabled(false);
     setSaveModuleEnabled(0);
-}
-
-void Camera::on_soft_trigger_btn_clicked() {
-    // 调用子线程进行单次抓图
-    QMetaObject::invokeMethod(worker_, "softTriggerOnce", Qt::QueuedConnection);
 }
 
 void Camera::on_save_btn_clicked() {
@@ -172,9 +202,7 @@ void Camera::on_save_btn_clicked() {
         return;
     }
 
-    // 将元数据存入 SQLite 数据库
     QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
-    // 数据库文件放在程序运行目录下的 data.db
     db.setDatabaseName(QCoreApplication::applicationDirPath() + "/data.db");
 
     if (!db.open()) {
@@ -193,7 +221,7 @@ void Camera::on_save_btn_clicked() {
                   "VALUES (:path, :time, :mode)");
     query.bindValue(":path", fileName);
     query.bindValue(":time", timestamp);
-    query.bindValue(":mode", trigger_mode_ == Connect_Mode ? "Continuous" : "Trigger");
+    query.bindValue(":mode", lastImageFile_.isEmpty() ? "Camera" : "Image");
 
     if (!query.exec()) {
         QMessageBox::warning(this, "数据库错误", query.lastError().text());
@@ -201,7 +229,6 @@ void Camera::on_save_btn_clicked() {
         qDebug() << "图片及记录已成功存入数据库！";
         QMessageBox::information(this, "成功", "图片已保存并录入数据库！");
     }
-
     db.close();
 }
 
@@ -215,77 +242,81 @@ void Camera::data_init() {
     ui->lineEdit_exposure->setText(QString::number(0));
     ui->lineEdit_frame->setText(QString::number(0));
     ui->lineEdit_gain->setText(QString::number(0));
-
+    ui->label_result->clear();
     findCamera();
 }
 
 void Camera::connect_init() {
+    // ---- 原 worker 信号 ----
     connect(worker_, &CameraWorker::paramsReady, this, &Camera::updateParamUI);
-
     connect(worker_, &CameraWorker::frameReady, this, &Camera::updateFrameUI);
     connect(worker_, &CameraWorker::errorOccurred, this, &Camera::handleError);
     connect(worker_, &CameraWorker::cameraOpened, this, &Camera::onCameraOpened);
-
-    connect(worker_,&CameraWorker::pushDisplay, this, [&]() {
+    connect(worker_, &CameraWorker::pushDisplay, this, [this]() {
         ui->label_display->setText("请打开设备");
     });
-
     connect(workerThread_, &QThread::finished, worker_, &QObject::deleteLater);
 
-    // 输入完曝光值
-    connect(ui->lineEdit_exposure, &QLineEdit::editingFinished, this, [=]() {
+    // ---- 新增：worker <-> processor 连接 ----
+    connect(worker_, &CameraWorker::frameForProcess,
+            processor_, &ImageProcessor::processFrame);          // 跨线程自动 Queued
+    connect(processor_, &ImageProcessor::busyChanged,
+            worker_, &CameraWorker::setProcBusy);
+    connect(processor_, &ImageProcessor::processedFrame,
+            this, &Camera::updateProcessedFrame);
+    connect(processor_, &ImageProcessor::plateFound,
+            this, &Camera::onPlateFound);
+    // Python 服务的状态直接显示在结果栏，看不到进度会以为卡死了
+    connect(processor_, &ImageProcessor::statusMessage, this,
+            [this](const QString &s) {
+                qDebug() << "[proc]" << s;
+                ui->label_result->setText(s);
+            });
+    connect(processorThread_, &QThread::finished,
+            processor_, &QObject::deleteLater);
+
+    // ---- 参数输入 ----
+    connect(ui->lineEdit_exposure, &QLineEdit::editingFinished, this, [this]() {
         double val = ui->lineEdit_exposure->text().toDouble();
-        // 跨线程将指令发送给子线程去执行！
-        QMetaObject::invokeMethod(worker_, "setExposureValue", Qt::QueuedConnection, Q_ARG(double, val));
+        QMetaObject::invokeMethod(worker_, "setExposureValue",
+                                  Qt::QueuedConnection, Q_ARG(double, val));
     });
-
-    // 输入完增益值
-    connect(ui->lineEdit_gain, &QLineEdit::editingFinished, this, [=]() {
+    connect(ui->lineEdit_gain, &QLineEdit::editingFinished, this, [this]() {
         double val = ui->lineEdit_gain->text().toDouble();
-        QMetaObject::invokeMethod(worker_, "setGainValue", Qt::QueuedConnection, Q_ARG(double, val));
+        QMetaObject::invokeMethod(worker_, "setGainValue",
+                                  Qt::QueuedConnection, Q_ARG(double, val));
     });
-
-    // 输入完帧率值
-    connect(ui->lineEdit_frame, &QLineEdit::editingFinished, this, [=]() {
+    connect(ui->lineEdit_frame, &QLineEdit::editingFinished, this, [this]() {
         double val = ui->lineEdit_frame->text().toDouble();
-        QMetaObject::invokeMethod(worker_, "setFrameValue", Qt::QueuedConnection, Q_ARG(double, val));
+        QMetaObject::invokeMethod(worker_, "setFrameValue",
+                                  Qt::QueuedConnection, Q_ARG(double, val));
     });
 }
 
-// 相机选取模块
 void Camera::setSelectModuleEnabled(bool enabled) {
     ui->comboBox_camera_list->setEnabled(enabled);
 }
 
-// 初始化模块
 void Camera::setInitModuleEnabled(bool enabled) {
     ui->open_btn->setEnabled(enabled);
     ui->close_btn->setEnabled(1 ^ enabled);
 }
 
-// 图像采集模块
 void Camera::setAcquireModuleEnabled(bool enabled) {
-    ui->radioButton_connect->setEnabled(enabled);
-    ui->radioButton_trigger->setEnabled(enabled);
     ui->start_btn->setEnabled(enabled);
     ui->stop_btn->setEnabled(enabled);
-    ui->soft_trigger_btn->setEnabled(enabled);
-    ui->checkBox_soft_trigger->setEnabled(enabled);
 }
 
-// 图片保存模块
 void Camera::setSaveModuleEnabled(bool enabled) {
     ui->save_btn->setEnabled(enabled);
 }
 
-// 参数模块
 void Camera::setParamModuleEnabled(bool enabled) {
     ui->lineEdit_exposure->setEnabled(enabled);
     ui->lineEdit_gain->setEnabled(enabled);
     ui->lineEdit_frame->setEnabled(enabled);
 }
 
-// 相机显示模块
 void Camera::setDisplayModuleEnabled(bool enabled) {
     if (!enabled) {
         ui->label_display->setText("未找到摄像头设备\n请连接设备后点击“查找设备”");
@@ -294,7 +325,6 @@ void Camera::setDisplayModuleEnabled(bool enabled) {
     }
 }
 
-// 总控函数
 void Camera::setAllDeviceUiEnabled(bool enabled) {
     setSelectModuleEnabled(enabled);
     setInitModuleEnabled(enabled);
