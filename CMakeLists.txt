@@ -14,7 +14,6 @@ find_package(Qt5 COMPONENTS
         Widgets
         REQUIRED
         Multimedia
-        Sql
 )
 find_package(OpenCV REQUIRED PATHS "D:/OpenCV_MinGW")
 
@@ -38,7 +37,6 @@ target_link_libraries(MVIC PRIVATE
         Qt5::Gui
         Qt5::Widgets
         Qt5::Multimedia
-        Qt5::Sql
 )
 
 

@@ -4,8 +4,8 @@
 #include <QObject>
 #include <QImage>
 #include <QMutex>
+#include <QTimer>
 #include <QThread>
-#include <QElapsedTimer>
 #include <atomic>
 #include <opencv2/opencv.hpp>
 
@@ -15,17 +15,12 @@ public:
     explicit CameraWorker(QObject *parent = nullptr);
     ~CameraWorker() override;
 
-    double get_exposure_mode();
-    double get_gain_mode();
-    double get_frame_mode();
-
 public slots:
     void openCamera(int index);
     void closeCamera();
     void stopAndCleanup();
     void startAcquisition();
     void stopAcquisition();
-    void setExposure(double val);
     void setExposureValue(double val);
     void setGainValue(double val);
     void setFrameValue(double val);
@@ -44,18 +39,26 @@ public slots:
     // 给 ImageProcessor 的帧
     void frameForProcess(const QImage &img);
 
+private slots:
+    // 定时器到点取一帧：刷新预览，识别开着就顺便送一帧去识别
+    void grabFrame();
+
 private:
     void readHardwareParams();
 
+    void applyParam(cv::VideoCaptureProperties prop, double val, const char *name);
+
+    double getFrameMode();
+    double getExposureMode();
+    double getGainMode();
+
     cv::VideoCapture cap_;
-    std::atomic<bool> isRunning_;
     QMutex mutex_;
     double fps_ = 0, exposure_ = 0, gain_ = 0;
 
-    // 处理分发控制
+    QTimer *timer_ = nullptr;
     std::atomic<bool> processEnabled_{false};
-    std::atomic<int>  procBusy_{0};
-    QElapsedTimer     procTimer_;
+    std::atomic<bool> procBusy_{false};
 };
 
 #endif // CAMERAWORKER_H

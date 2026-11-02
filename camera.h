@@ -7,11 +7,7 @@
 #include <QCameraInfo>
 #include <QThread>
 #include <QMessageBox>
-#include <QDateTime>
-#include <QDir>
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QSqlError>
+#include <QLineEdit>
 #include <QImage>
 
 #include "ui_Camera.h"
@@ -41,7 +37,6 @@ public slots:
     void on_close_btn_clicked();
     void on_start_btn_clicked();
     void on_stop_btn_clicked();
-    void on_save_btn_clicked();
 
     void updateParamUI(double fps, double exposure, double gain);
 
@@ -53,25 +48,25 @@ private:
     void data_init();
     void connect_init();
 
+    void showImage(const QImage &img);
+
+    void connectParamEdit(QLineEdit *edit, const char *slot, const QString &label);
+
     void setSelectModuleEnabled(bool enabled);
     void setInitModuleEnabled(bool enabled);
     void setAcquireModuleEnabled(bool enabled);
-    void setSaveModuleEnabled(bool enabled);
     void setParamModuleEnabled(bool enabled);
     void setDisplayModuleEnabled(bool enabled);
     void setAllDeviceUiEnabled(bool enabled);
 
     Ui::Camera *ui;
-    QString camera_name_;
     QList<QCameraInfo> cameras_;
     QThread *workerThread_;
     CameraWorker *worker_;
-    QImage currentImage_;
 
-    QThread        *processorThread_ = nullptr;
-    ImageProcessor *processor_       = nullptr;
-    bool            processingActive_ = false;
-    QString         lastImageFile_;      // 最近打开的图片，保存时用得上
+    QThread *processorThread_ = nullptr;
+    ImageProcessor *processor_ = nullptr;
+    bool processingActive_ = false;
 };
 
 #endif // MVIC_CAMERA_H

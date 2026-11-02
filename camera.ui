@@ -225,27 +225,6 @@ QPushButton#stop_btn:disabled {
     border-color: #F7D9D9;
 }
 
-/* ---------- 按钮：保存 ---------- */
-QPushButton#save_btn {
-    background-color: #2F6BFF;
-    border: 1px solid #2F6BFF;
-    color: #FFFFFF;
-}
-QPushButton#save_btn:hover {
-    background-color: #1D5AEF;
-    border-color: #1D5AEF;
-    color: #FFFFFF;
-}
-QPushButton#save_btn:pressed {
-    background-color: #1748C6;
-    border-color: #1748C6;
-}
-QPushButton#save_btn:disabled {
-    background-color: #F2F4F7;
-    color: #B0B8C4;
-    border-color: #E4E9F2;
-}
-
 /* ---------- 下拉框 ---------- */
 QComboBox {
     background-color: #FFFFFF;
@@ -740,7 +719,8 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
               </sizepolicy>
              </property>
              <property name="toolTip">
-              <string>输入曝光值后按回车生效</string>
+              <string>输入曝光值后按回车生效。
+DirectShow 后端下通常是负的档位数（例如 -1 到 -13，越负画面越暗），填正数多半无效。</string>
              </property>
             </widget>
            </item>
@@ -760,7 +740,8 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
               </sizepolicy>
              </property>
              <property name="toolTip">
-              <string>输入增益值后按回车生效</string>
+              <string>输入增益值后按回车生效。
+增益会同时放大噪点，弱光下才需要调高。</string>
              </property>
             </widget>
            </item>
@@ -780,32 +761,8 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
               </sizepolicy>
              </property>
              <property name="toolTip">
-              <string>输入目标帧率后按回车生效</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="groupBox_2">
-          <property name="title">
-           <string>图片保存</string>
-          </property>
-          <layout class="QVBoxLayout" name="saveLayout">
-           <item>
-            <widget class="QPushButton" name="save_btn">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="toolTip">
-              <string>将当前画面保存到 images 目录并写入数据库</string>
-             </property>
-             <property name="text">
-              <string>保存</string>
+              <string>输入目标帧率后按回车生效。
+多数 USB 摄像头不支持运行时改帧率，填了也可能没反应；识别速度取决于单帧耗时，不受此影响。</string>
              </property>
             </widget>
            </item>
