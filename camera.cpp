@@ -1,19 +1,25 @@
 #include "camera.h"
 
+#include "Sql.h"
+
 Camera::Camera(QWidget *parent) : QWidget(parent), ui(new Ui::Camera),
-workerThread_(new QThread(this)), worker_(new CameraWorker()) {
+                                  workerThread_(new QThread(this)), worker_(new CameraWorker()) {
     ui->setupUi(this);
 
     worker_->moveToThread(workerThread_);
 
     processorThread_ = new QThread(this);
     processor_ = new ImageProcessor();
+    data_ = new Sql();
+    dataThread_ = new QThread(this);
+    data_->moveToThread(dataThread_);
     processor_->moveToThread(processorThread_);
 
     connect_init();
 
     workerThread_->start();
     processorThread_->start();
+    dataThread_->start();
 
     // 后台预热 OCR 服务（加载模型要 4 秒左右），不阻塞界面
     QMetaObject::invokeMethod(processor_, &ImageProcessor::warmup,
@@ -30,6 +36,10 @@ Camera::~Camera() {
     if (processorThread_ && processorThread_->isRunning()) {
         processorThread_->quit();
         processorThread_->wait();
+    }
+    if (dataThread_ && dataThread_->isRunning()) {
+        dataThread_->quit();
+        dataThread_->wait();
     }
     delete ui;
 }
@@ -50,11 +60,18 @@ void Camera::handleError(const QString &msg) {
 }
 
 void Camera::showImage(const QImage &img) {
-    ui->label_display->setPixmap(
-        QPixmap::fromImage(img).scaled(
-            ui->label_display->size(),
-            Qt::KeepAspectRatio,
-            Qt::SmoothTransformation));
+    const QSize target = ui->label_display->size();
+    // 原来先把整张原图转成 QPixmap、再做全尺寸平滑缩放，两步都在 UI 线程，
+    // 一帧几十毫秒，30fps 根本跟不上，事件队列越堆越多就越卡。
+    // 改成先把 QImage 快速缩到显示区大小，再转 QPixmap：
+    // 像素量只剩原来的几分之一，UI 线程开销大幅下降。
+    // 放大时才用平滑缩放（小图放大代价低），保持观感。
+    const Qt::TransformationMode mode =
+        (img.width() > target.width() || img.height() > target.height())
+        ? Qt::FastTransformation : Qt::SmoothTransformation;
+
+    const QImage small = img.scaled(target, Qt::KeepAspectRatio, mode);
+    ui->label_display->setPixmap(QPixmap::fromImage(small));
 }
 
 // 摄像头原始画面
@@ -71,6 +88,8 @@ void Camera::updateProcessedFrame(const QImage &img) {
 
 void Camera::onPlateFound(const QString &text) {
     ui->label_result->setText("车牌: " + text);
+    QString sql = "SELECT plate, name FROM test WHERE plate = " + text;
+    emit check(sql, 0);
 }
 
 void Camera::findCamera() {
@@ -88,6 +107,32 @@ void Camera::findCamera() {
 
     setSelectModuleEnabled(1);
     setDisplayModuleEnabled(1);
+}
+
+void Camera::on_PageChanged(int index) {
+    if (index == 0) {
+        QMetaObject::invokeMethod(worker_, "startAcquisition", Qt::QueuedConnection);
+        processingActive_ = 0;
+    }
+    else if (index == 1) {
+        QMetaObject::invokeMethod(worker_, "stopAcquisition", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(worker_, "setProcessingEnabled", Qt::QueuedConnection,Q_ARG(bool, 0));
+        processingActive_ = 0;
+        QMetaObject::invokeMethod(worker_, "setProcBusy", Qt::QueuedConnection, Q_ARG(bool, 0));
+        if (!ui->open_btn->isEnabled()) {
+            ui->start_btn->setEnabled(1);
+        }
+        ui->stop_btn->setEnabled(0);
+    } else {
+        QMetaObject::invokeMethod(worker_, "stopAcquisition", Qt::QueuedConnection);
+        QMetaObject::invokeMethod(worker_, "setProcessingEnabled", Qt::QueuedConnection,Q_ARG(bool, 0));
+        processingActive_ = 0;
+        QMetaObject::invokeMethod(worker_, "setProcBusy", Qt::QueuedConnection, Q_ARG(bool, 0));
+        if (!ui->open_btn->isEnabled()) {
+            ui->start_btn->setEnabled(1);
+        }
+        ui->stop_btn->setEnabled(0);
+    }
 }
 
 void Camera::on_find_btn_clicked() {
@@ -122,7 +167,6 @@ void Camera::on_start_btn_clicked() {
     processingActive_ = true;
     QMetaObject::invokeMethod(worker_, "setProcessingEnabled",
                               Qt::QueuedConnection, Q_ARG(bool, true));
-    ui->label_result->clear();
 
     ui->start_btn->setEnabled(false);
     ui->stop_btn->setEnabled(true);
@@ -143,15 +187,116 @@ void Camera::updateParamUI(double fps, double exposure, double gain) {
     ui->lineEdit_gain->setText(QString::number(gain, 'f', 2));
 }
 
+void Camera::updateParamUI_image(double fps, double exposure, double gain) {
+    ui->lineEdit_frame_image->setText(QString::number(fps, 'f', 2));
+    ui->lineEdit_exposure_image->setText(QString::number(exposure, 'f', 2));
+    ui->lineEdit_gain_image->setText(QString::number(gain, 'f', 2));
+}
+
+void Camera::on_open_btn_image_clicked() {
+    // 打开本地文件对话框
+    imgPath = QFileDialog::getOpenFileName(this, tr("选择图片"), QDir::homePath() + "/Pictures", tr("图片文件 (*.png *.jpg *.jpeg *.bmp);;所有文件 (*)"));
+
+    // 用户没点取消，拿到路径
+    if (imgPath.isEmpty()) {
+        return ;
+    }
+    QPixmap pix(imgPath);
+    ui->label_display_image->setPixmap(pix.scaled(ui->label_display_image->size(),
+                                                 Qt::KeepAspectRatio,
+                                                 Qt::SmoothTransformation));
+
+    ui->lineEdit_exposure_image->setEnabled(1);
+    ui->lineEdit_gain_image->setEnabled(1);
+    ui->lineEdit_frame_image->setEnabled(1);
+    ui->start_btn_image->setEnabled(1);
+}
+
+
+void Camera::on_start_btn_image_clicked() {
+    emit send_image(imgPath);
+}
+
+void Camera::on_btn_find_car_clicked() {
+    QString plate = ui->lineEdit_find_car->text();
+    QString name = ui->lineEdit_find_name->text();
+    if (!plate.isEmpty() && !name.isEmpty()) {
+        QString sql = "SELECT plate, name FROM test WHERE plate = " + plate + " AND name = " + name;
+        send_sql(sql);
+    } else if (!plate.isEmpty()) {
+        QString sql = "SELECT plate, name FROM test WHERE plate = " + plate;
+        send_sql(sql);
+    } else if (!name.isEmpty()) {
+        QString sql = "SELECT plate, name FROM test WHERE name = " + name;
+        send_sql(sql);
+    } else {
+        QString sql = "SELECT plate, name FROM test";
+        send_sql(sql);
+    }
+}
+
+void Camera::on_btn_refresh_plate_clicked() {
+    QString sql = "SELECT plate, name FROM test";
+    send_sql(sql);
+}
+
+void Camera::on_btn_add_plate_clicked() {
+    QString plate = ui->lineEdit_change_car->text();
+    QString name = ui->lineEdit_change_name->text();
+    if (plate.isEmpty() || name.isEmpty()) {
+        QMessageBox::information(this, "提示", "车牌号或者姓名未填写");
+        return ;
+    }
+    QString sql = "INSERT INTO test (plate, name) VALUES (" + plate + ", " + name + ")";
+    emit send_sql(sql);
+    on_btn_refresh_plate_clicked();
+}
+
+void Camera::on_btn_delete_plate_clicked() {
+    QString plate = ui->lineEdit_change_car->text();
+    QString name = ui->lineEdit_change_name->text();
+    if (!plate.isEmpty()) {
+        QString sql = "DELETE FROM test WHERE plate = " + plate;
+        send_sql(sql);
+    } else if (!name.isEmpty()) {
+        QString sql = "DELETE FROM test WHERE name = " + name;
+        send_sql(sql);
+    } else {
+        QMessageBox::information(this, "提示", "车牌号或者姓名未填写");
+    }
+    on_btn_refresh_plate_clicked();
+}
+
+void Camera::data_show(const QList<QVariantMap> &data) {
+    ui->tableWidget->setColumnCount(2);
+    ui->tableWidget->setHorizontalHeaderLabels(
+        QStringList()<< "车牌号" << "姓名");
+    ui->tableWidget->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    ui->tableWidget->setRowCount(data.size());
+    for (int i = 0; i < data.size(); ++i) {
+        ui->tableWidget->setItem(i, 0, new QTableWidgetItem(data[i]["plate"].toString()));
+        ui->tableWidget->setItem(i, 1, new QTableWidgetItem(data[i]["name"].toString()));
+    }
+}
+
 void Camera::data_init() {
-    ui->lineEdit_exposure->setText(QString::number(0));
-    ui->lineEdit_frame->setText(QString::number(0));
-    ui->lineEdit_gain->setText(QString::number(0));
-    ui->label_result->clear();
+    // 实时
     findCamera();
+
+    // 图片
+    ui->start_btn_image->setEnabled(0);
+    ui->lineEdit_exposure_image->setEnabled(0);
+    ui->lineEdit_gain_image->setEnabled(0);
+    ui->lineEdit_frame_image->setEnabled(0);
+
+    // 管理
+    emit send_sql("SELECT plate, name FROM test");
 }
 
 void Camera::connect_init() {
+    connect(ui->stackedWidget, &QStackedWidget::currentChanged,
+            this, &Camera::on_PageChanged);
+
     connect(worker_, &CameraWorker::paramsReady, this, &Camera::updateParamUI);
     connect(worker_, &CameraWorker::frameReady, this, &Camera::updateFrameUI);
     connect(worker_, &CameraWorker::errorOccurred, this, &Camera::handleError);
@@ -160,8 +305,38 @@ void Camera::connect_init() {
         ui->label_display->setText("请打开设备");
     });
 
+    connect(this, &Camera::check, data_, &Sql::check);
+    connect(data_, &Sql::send_is_data, this,[this](const QString& str) {
+        ui->label_result_name->setText(str);
+    });
+
+
+    // 管理
+    connect(data_, &Sql::sendData, this, &Camera::data_show);
+    connect(this, &Camera::send_sql, data_, &Sql::query);
+    // 图片
+    connect(this, &Camera::send_image, processor_, &ImageProcessor::processImage);
+    connect(processor_, &ImageProcessor::processedImage, this, [this](const QImage& img) {
+        ui->label_display_image->setPixmap(
+        QPixmap::fromImage(img).scaled(
+            ui->label_display_image->size(),
+            Qt::KeepAspectRatio,
+            Qt::SmoothTransformation));
+
+    });
+    connect(processor_, &ImageProcessor::plateFound_image, this,
+        [this](const QString &s) {
+            ui->label_result_image->setText(s);
+            QString sql = "SELECT plate, name FROM test WHERE plate = " + s;
+            emit check(sql, 1);
+    });
+    connect(data_, &Sql::send_is_data_image, this, [this](const QString& str) {
+        ui->label_result_image_name->setText(str);
+    });
+
     connect(workerThread_, &QThread::finished, worker_, &QObject::deleteLater);
     connect(processorThread_, &QThread::finished, processor_, &QObject::deleteLater);
+    connect(dataThread_, &QThread::finished, data_, &QObject::deleteLater);
 
     connect(worker_, &CameraWorker::frameForProcess,
             processor_, &ImageProcessor::processFrame);
@@ -175,7 +350,8 @@ void Camera::connect_init() {
     connect(processor_, &ImageProcessor::statusMessage, this,
             [this](const QString &s) {
                 qDebug() << "[proc]" << s;
-                ui->label_result->setText(s);
+                ui->label_result_image_py->setText(s);
+                ui->label_frame_py->setText(s);
             });
 
     connectParamEdit(ui->lineEdit_exposure, "setExposureValue", "曝光");

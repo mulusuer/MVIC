@@ -23,12 +23,16 @@ public slots:
 
     void processFrame(const QImage &img);
 
+    void processImage(const QString& path);
+
 signals:
     // 结果刷新 label_display
     void processedFrame(const QImage &img);
+    void processedImage(const QImage &img);
 
     // 识别到车牌号
     void plateFound(const QString &text);
+    void plateFound_image(const QString &text);
 
     // 忙/闲通知给 worker
     void busyChanged(bool busy);

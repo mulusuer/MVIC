@@ -38,6 +38,15 @@ void CameraWorker::openCamera(int index) {
 
     {
         QMutexLocker locker(&mutex_);
+        // 只调摄像头硬件参数，采集流程一个字不改。
+        // DSHOW 默认用 YUY2 未压缩，高分辨率下往往只有 5~10fps；
+        // 换成 MJPG 压缩格式，同一分辨率能跑到 30fps。
+        cap_.set(cv::CAP_PROP_FOURCC,
+                 cv::VideoWriter::fourcc('M', 'J', 'P', 'G'));
+        if (cap_.get(cv::CAP_PROP_FPS) < 30)
+            cap_.set(cv::CAP_PROP_FPS, 30);
+        cap_.set(cv::CAP_PROP_BUFFERSIZE, 1);   // 只保留最新一帧，少一点延迟
+
         const double cur = cap_.get(cv::CAP_PROP_EXPOSURE);
         cap_.set(cv::CAP_PROP_AUTO_EXPOSURE, 0);      // 0 = 手动
         readHardwareParams();
@@ -66,7 +75,7 @@ void CameraWorker::stopAndCleanup() {
 void CameraWorker::startAcquisition() {
     if (!timer_) {
         timer_ = new QTimer(this);
-        timer_->setTimerType(Qt::CoarseTimer);
+        timer_->setTimerType(Qt::PreciseTimer);   // 10ms 定时用粗糙时钟会抖
         connect(timer_, &QTimer::timeout, this, &CameraWorker::grabFrame);
     }
     timer_->start(10);

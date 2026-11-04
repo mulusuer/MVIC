@@ -131,6 +131,63 @@ void ImageProcessor::processFrame(const QImage &img) {
     emit busyChanged(false);
 }
 
+void ImageProcessor::processImage(const QString &path) {
+    QImage img(path);
+    if (img.isNull()) return;
+
+    QImage rgb = img.convertToFormat(QImage::Format_RGB888);
+    cv::Mat view(rgb.height(), rgb.width(), CV_8UC3,
+                 rgb.bits(), static_cast<size_t>(rgb.bytesPerLine()));
+    cv::Mat bgr;
+    cv::cvtColor(view, bgr, cv::COLOR_RGB2BGR);
+
+    const int maxSide = 1280;
+    const int big = std::max(bgr.cols, bgr.rows);
+    if (big > maxSide) {
+        const double s = double(maxSide) / double(big);
+        cv::resize(bgr, bgr, cv::Size(), s, s, cv::INTER_AREA);
+    }
+
+    const QString line = recognize(bgr);
+    const QList<Plate> plates = parseResult(line);
+
+
+    cv::Mat marked = bgr.clone();
+    for (const Plate &p : plates)
+        cv::rectangle(marked, p.box, cv::Scalar(0, 255, 0), 2);
+
+    QImage out = matToQImage(marked);
+
+    // 车牌号
+    if (!plates.isEmpty()) {
+        QPainter painter(&out);
+        QFont font;
+        font.setPointSize(14);
+        font.setBold(true);
+        painter.setFont(font);
+        painter.setPen(QPen(Qt::yellow, 2));
+
+        for (const Plate &p : plates) {
+            int textY = p.box.y - 6;
+            if (textY < 18) textY = p.box.y + p.box.height + 22;  // 太靠上就画到框下面
+            painter.drawText(p.box.x, textY, p.text);
+        }
+        painter.end();
+    }
+
+    if (!plates.isEmpty()) {
+        QStringList names;
+        for (const Plate &p : plates) names << p.text;
+        const QString joined = names.join(", ");
+        if (joined != lastPlate_) {
+            lastPlate_ = joined;
+            emit plateFound_image(joined);
+        }
+    }
+
+    emit processedImage(out);
+}
+
 QString ImageProcessor::recognize(const cv::Mat &bgr) {
     if (bgr.empty()) return {};
 
@@ -190,7 +247,7 @@ bool ImageProcessor::ensureOcrReady() {
         }
 
         ocrReady_ = true;
-        emit statusMessage(QString("识别服务已就绪（%1）").arg(pythonScript_));
+        emit statusMessage(QString("识别服务已就绪"));
     }
 
     return ocrReady_;
